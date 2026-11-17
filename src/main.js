@@ -10,7 +10,7 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true 
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
 const scene = new THREE.Scene()
 scene.fog = new THREE.FogExp2(0x0b0314, 0.016)
-const cam = new THREE.PerspectiveCamera(55, 1, 0.1, 250)
+const cam = new THREE.PerspectiveCamera(55, 1, 0.1, 320)
 cam.position.set(0, 0, 8)
 
 // soft glow sprite
@@ -44,32 +44,43 @@ function makeBrain(n = 850) {
   grp.add(pts, lines); return grp
 }
 const brain = makeBrain(); brain.scale.setScalar(2.2); scene.add(brain)
-const brain2 = makeBrain(600); brain2.scale.setScalar(1.8); brain2.position.set(3.4, 0, -102); scene.add(brain2)
+const brain2 = makeBrain(600); brain2.scale.setScalar(1.8); brain2.position.set(3.4, 0, -152); scene.add(brain2)
 
 // ---- depth particle field ----
 {
-  const n = 3200, p = [], col = []
-  for (let i = 0; i < n; i++) { p.push(rnd(-34, 34), rnd(-20, 20), rnd(-120, 12)); col.push(...mix(Math.random()).toArray()) }
+  const n = 4800, p = [], col = []
+  for (let i = 0; i < n; i++) { p.push(rnd(-34, 34), rnd(-20, 20), rnd(-190, 12)); col.push(...mix(Math.random()).toArray()) }
   const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); gg.setAttribute('color', new THREE.Float32BufferAttribute(col, 3))
   scene.add(new THREE.Points(gg, glow(.14, .8)))
 }
 const wire = (geo, color, op = .55) => new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity: op, blending: THREE.AdditiveBlending }))
 
 // ---- set pieces (one per section) ----
-const ico = wire(new THREE.IcosahedronGeometry(2.1, 2), V); ico.position.set(3.6, 0, -22); scene.add(ico)       // MindProbe
+const ico = wire(new THREE.IcosahedronGeometry(2.1, 2), V); ico.position.set(3.6, 0, -52); scene.add(ico)       // MindProbe
 const ico2 = wire(new THREE.IcosahedronGeometry(1.2, 1), L, .8); ico.add(ico2)
-const waves = new THREE.Group(); waves.position.set(-3.8, 0, -42); scene.add(waves)                                // Brain Lens (EEG)
+const waves = new THREE.Group(); waves.position.set(-3.8, 0, -72); scene.add(waves)                                // Brain Lens (EEG)
 const wl = []
 for (let k = 0; k < 6; k++) {
   const geo = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(121 * 3), 3))
   const l = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: k % 2 ? B : L, transparent: true, opacity: .8, blending: THREE.AdditiveBlending }))
   l.position.y = (k - 2.5) * .55; l.userData.k = k; waves.add(l); wl.push(l)
 }
-const rings = new THREE.Group(); rings.position.set(3.6, 0, -62); scene.add(rings)                                 // Testarena
+const rings = new THREE.Group(); rings.position.set(3.6, 0, -92); scene.add(rings)                                 // Testarena
 for (let k = 0; k < 4; k++) { const t = wire(new THREE.TorusGeometry(1 + k * .55, .03 + k * .01, 12, 80), k % 2 ? B : V, .9); t.rotation.x = k * .5; rings.add(t) }
-const globe = wire(new THREE.SphereGeometry(4.2, 28, 20), V, .25); globe.position.set(0, 0, -82); scene.add(globe) // About
+const globe = wire(new THREE.SphereGeometry(4.2, 28, 20), V, .25); globe.position.set(0, 0, -112); scene.add(globe) // About
 const orbit = new THREE.Group(); globe.add(orbit)
 for (let k = 0; k < 14; k++) { const s = new THREE.Mesh(new THREE.SphereGeometry(.12, 12, 12), new THREE.MeshBasicMaterial({ color: L })); const a = k / 14 * 6.283; s.position.set(Math.cos(a) * 5.2, Math.sin(a * 3) * 1.2, Math.sin(a) * 5.2); orbit.add(s) }
+
+// Career OS: 8-node journey path
+const path = new THREE.Group(); path.position.set(3.4, 0, -32); scene.add(path)
+{
+  const pts = [], nodes = []
+  for (let k = 0; k < 8; k++) { const t = k / 7; pts.push(new THREE.Vector3((t - .5) * 7, Math.sin(t * 6.283) * 1.4 + t * 1.2 - .6, Math.cos(t * 5) * .8)) }
+  const curve = new THREE.CatmullRomCurve3(pts)
+  path.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(curve.getPoints(120)), new THREE.LineBasicMaterial({ color: L, transparent: true, opacity: .7, blending: THREE.AdditiveBlending })))
+  pts.forEach((v, k) => { const m = new THREE.Mesh(new THREE.SphereGeometry(k === 7 ? .32 : .18, 16, 16), new THREE.MeshBasicMaterial({ color: k === 7 ? 0x5eead4 : k % 2 ? B : V })); m.position.copy(v); path.add(m); nodes.push(m) })
+  path.userData.nodes = nodes
+}
 
 // ---- scroll: camera glides through stages (z from data-z) ----
 const stages = [...document.querySelectorAll('[data-z]')]
@@ -98,6 +109,7 @@ renderer.setAnimationLoop(() => {
   brain2.rotation.y = -t * .15
   ico.rotation.set(t * .2, t * .3, 0); ico2.rotation.set(-t * .4, t * .2, 0)
   rings.children.forEach((r, i) => { r.rotation.x += .004 * (i + 1); r.rotation.y += .003 * (i % 2 ? -1 : 1) })
+  path.rotation.y = Math.sin(t * .3) * .35; path.userData.nodes.forEach((m, i) => m.scale.setScalar(1 + .25 * Math.sin(t * 2 + i)))
   globe.rotation.y = t * .05; orbit.rotation.y = -t * .25
   wl.forEach(l => { const a = l.geometry.attributes.position, k = l.userData.k
     for (let i = 0; i <= 120; i++) { const x = (i / 120 - .5) * 6; a.setXYZ(i, x, Math.sin(x * 2 + t * (1.2 + k * .3)) * .25 * Math.sin(x * .8 + t) + Math.sin(x * 5 + t * 2 + k) * .06, 0) }
@@ -106,6 +118,18 @@ renderer.setAnimationLoop(() => {
 })
 
 // ---- UI ----
+document.querySelectorAll('[data-count]').forEach(el => {
+  const end = +el.dataset.count, o = { v: 0 }
+  ScrollTrigger.create({ trigger: el, start: 'top 90%', once: true, onEnter: () => gsap.to(o, { v: end, duration: 1.8, ease: 'power2.out', onUpdate: () => el.textContent = Math.round(o.v).toLocaleString('en-IN') + (el.dataset.plus ? '+' : '') }) })
+})
+const ov = document.getElementById('services')
+const openSvc = () => { ov.hidden = false; requestAnimationFrame(() => ov.classList.add('open')); document.body.style.overflow = 'hidden' }
+const closeSvc = () => { ov.classList.remove('open'); document.body.style.overflow = ''; setTimeout(() => ov.hidden = true, 350) }
+document.querySelectorAll('[data-open="services"]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); openSvc() }))
+ov.addEventListener('click', e => { if (e.target === ov || e.target.closest('[data-close]')) closeSvc() })
+addEventListener('keydown', e => { if (e.key === 'Escape' && !ov.hidden) closeSvc() })
+if (location.hash === '#services') openSvc()
+
 gsap.utils.toArray('.reveal').forEach(el => gsap.from(el, { y: 60, opacity: 0, duration: 1, ease: 'power3.out', scrollTrigger: { trigger: el, start: 'top 82%' } }))
 gsap.from('.hero-copy > *', { y: 40, opacity: 0, stagger: .12, duration: 1, delay: .6, ease: 'power3.out' })
 document.querySelectorAll('.tilt').forEach(el => {
